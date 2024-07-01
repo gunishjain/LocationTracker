@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -5,9 +8,17 @@ plugins {
     id("com.google.dagger.hilt.android")
 }
 
+val localPropertiesFile = rootProject.file("local.properties")
+val localProperties = Properties()
+
+if (localPropertiesFile.exists()) {
+    localProperties.load(FileInputStream(localPropertiesFile))
+}
+
 android {
     namespace = "com.gunishjain.locationtracker"
     compileSdk = 34
+
 
     defaultConfig {
         applicationId = "com.gunishjain.locationtracker"
@@ -23,6 +34,12 @@ android {
     }
 
     buildTypes {
+
+        debug {
+            buildConfigField("String", "API_KEY", "${localProperties["supabasekey"]}")
+            buildConfigField("String", "BASE_URL", "${localProperties["supabaseurl"]}")
+        }
+
         release {
             isMinifyEnabled = false
             proguardFiles(
@@ -40,6 +57,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.1"
@@ -89,5 +107,20 @@ dependencies {
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
     implementation("androidx.hilt:hilt-navigation-fragment:1.0.0")
+
+    implementation("androidx.compose.material3:material3:1.2.1")
+    implementation("androidx.compose.material3:material3-window-size-class:1.2.1")
+    implementation("androidx.compose.material3:material3-adaptive-navigation-suite:1.3.0-beta03")
+
+    val supabase_version = "2.5.1"
+    val ktor_version = "2.3.12"
+
+    implementation("io.github.jan-tennert.supabase:postgrest-kt:$supabase_version")
+    implementation("io.github.jan-tennert.supabase:storage-kt:$supabase_version")
+    implementation("io.github.jan-tennert.supabase:gotrue-kt:$supabase_version")
+    implementation("io.ktor:ktor-client-android:$ktor_version")
+    implementation("io.ktor:ktor-client-core:$ktor_version")
+    implementation("io.ktor:ktor-utils:$ktor_version")
+
 
 }
