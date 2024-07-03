@@ -1,8 +1,8 @@
 package com.gunishjain.locationtracker.di.module
 
-import com.gunishjain.locationtracker.Utils.Constants.API_KEY
-import com.gunishjain.locationtracker.Utils.Constants.BASE_URL
-import com.gunishjain.locationtracker.Utils.Constants.HOST_NAME
+import com.gunishjain.locationtracker.utils.Constants.API_KEY
+import com.gunishjain.locationtracker.utils.Constants.BASE_URL
+import com.gunishjain.locationtracker.utils.Constants.HOST_NAME
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -25,37 +25,33 @@ class ApplicationModule {
 
     @Provides
     @Singleton
-    fun provideSupabaseClient(): SupabaseClient {
+    fun provideSupaBaseClient(): SupabaseClient {
         return createSupabaseClient(
-            supabaseUrl = API_KEY,
-            supabaseKey = BASE_URL
+            supabaseUrl = BASE_URL,
+            supabaseKey = API_KEY
         ) {
             install(Postgrest)
-            install(Auth) {
-                flowType = FlowType.PKCE
-                scheme = "app"
-                host = HOST_NAME
-            }
+            install(Auth)
             install(Storage)
         }
     }
 
     @Provides
     @Singleton
-    fun provideSupabaseDatabase(client: SupabaseClient): Postgrest {
+    fun provideSupaBaseDatabase(client: SupabaseClient): Postgrest {
         return client.postgrest
     }
 
     @Provides
     @Singleton
-    fun provideSupabaseAuth(client: SupabaseClient): Auth {
+    fun provideSupaBaseAuth(client: SupabaseClient): Auth {
         return client.auth
     }
 
 
     @Provides
     @Singleton
-    fun provideSupabaseStorage(client: SupabaseClient): Storage {
+    fun provideSupaBaseStorage(client: SupabaseClient): Storage {
         return client.storage
     }
 
