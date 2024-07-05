@@ -1,12 +1,11 @@
 package com.gunishjain.locationtracker.ui.register
 
-import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.gunishjain.locationtracker.data.repository.AuthRepository
+import com.gunishjain.locationtracker.data.model.User
 import com.gunishjain.locationtracker.utils.Constants.PROFILE_PIC_BUCKET
 import com.gunishjain.locationtracker.utils.SharedPreferenceHelper
 import com.gunishjain.locationtracker.utils.UserState
@@ -14,84 +13,78 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.providers.builtin.Email
+import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.storage.storage
-import io.github.jan.supabase.storage.upload
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import org.json.JSONObject
 import javax.inject.Inject
 import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.minutes
 
 @HiltViewModel
 class SupaBaseAuthViewModel @Inject constructor(
-    private val client: SupabaseClient
+    private val client: SupabaseClient,
+    private val sharedPreferenceHelper: SharedPreferenceHelper
 ) : ViewModel() {
 
     private val _userState = mutableStateOf<UserState>(UserState.Loading)
     val userState: State<UserState> = _userState
 
     fun registerUser(
-        context : Context,
         username: String,
-        useremail: String,
-        userpassword: String,
-        imageByteArray: ByteArray,
+        userEmail: String,
+        userPassword: String,
+        caste: String,
+//        imageByteArray: ByteArray,
         phone: String
     ) {
         viewModelScope.launch {
             try {
-                val filename = username
-                val bucket = client.storage[PROFILE_PIC_BUCKET]
-                bucket.upload("$filename.jpg",imageByteArray)
-                val url = bucket.createSignedUrl("$filename.jpg", expiresIn = 17520.hours)
 
-                Log.d("imageurl:",url)
-
-               val data = client.auth.signUpWith(Email) {
-                    email =useremail
-                    password = userpassword
+                val data = client.auth.signUpWith(Email) {
+                    email = userEmail
+                    password = userPassword
                     data = buildJsonObject {
-                        put("name",username)
-                        put("profile_pic",url)
-                        put("user_caste","test")
-                        put("phone",phone)
+                        put("name", username)
+                        put("user_caste", caste)
+                        put("profile_pic", "default")
+                        put("phone", phone)
 
                     }
                 }
 
+                saveToken()
 
-                saveToken(context)
-                Log.d("metadata",client.auth.currentAccessTokenOrNull().toString())
+                _userState.value = UserState.Success("Registration successful")
 
-
-            } catch (e : Exception) {
+            } catch (e: Exception) {
                 _userState.value = UserState.Error("Error: ${e.message}")
-                Log.d("vm",e.message.toString())
+                Log.d("vm-register", e.message.toString())
 
             }
         }
     }
 
 
-    private fun saveToken(context: Context) {
+    private fun saveToken() {
 
         viewModelScope.launch {
             val accessToken = client.auth.currentAccessTokenOrNull()
-            val sharedPref = SharedPreferenceHelper(context)
-            sharedPref.savedStringData("accessToken",accessToken)
+            val sharedPref = sharedPreferenceHelper
+            sharedPref.savedStringData("accessToken", accessToken)
         }
 
     }
 
-    private fun getToken(context: Context): String? {
-        val sharedPref = SharedPreferenceHelper(context)
+    private fun getToken(): String? {
+        val sharedPref = sharedPreferenceHelper
         return sharedPref.getStringData("accessToken")
     }
 
 
     fun loginUser(
-        context: Context,
         userEmail: String,
         userPassword: String
     ) {
@@ -99,54 +92,101 @@ class SupaBaseAuthViewModel @Inject constructor(
             try {
 
                 client.auth.signInWith(Email) {
-                    email=userEmail
-                    password=userPassword
+                    email = userEmail
+                    password = userPassword
                 }
-                saveToken(context)
+                saveToken()
+                _userState.value = UserState.Success("Login successful")
 
-            } catch (e: Exception){
-
+            } catch (e: Exception) {
+                _userState.value = UserState.Error("Error: ${e.message}")
             }
         }
     }
 
-    fun logout(context: Context) {
+    fun logout() {
 
-        val sharedPref = SharedPreferenceHelper(context)
         viewModelScope.launch {
             _userState.value = UserState.Loading
             try {
                 client.auth.signOut()
-                sharedPref.clearPreference()
+                sharedPreferenceHelper.clearPreference()
                 _userState.value = UserState.Success("Logged Out Successfully!")
 
-            } catch (e: Exception){
+            } catch (e: Exception) {
                 _userState.value = UserState.Error("Error: ${e.message}")
             }
         }
     }
 
 
-    fun isUserLoggedIn(context: Context) {
+    fun isUserLoggedIn() {
         viewModelScope.launch {
             try {
 
-                val token = getToken(context)
-                if(token.isNullOrEmpty()){
+                val token = getToken()
+                if (token.isNullOrEmpty()) {
                     _userState.value = UserState.Error("User is not Logged In!")
+                    Log.d("gunish", "here")
                 } else {
                     client.auth.retrieveUser(token)
                     client.auth.refreshCurrentSession()
-                    saveToken(context)
+                    saveToken()
                     _userState.value = UserState.Success("User is already logged In!")
 
                 }
 
-
-            } catch (e: Exception){
+            } catch (e: Exception) {
                 _userState.value = UserState.Error("Error: ${e.message}")
             }
         }
     }
+
+    fun uploadImage(imageByteArray: ByteArray) {
+
+        viewModelScope.launch {
+
+            try {
+                val user = client.auth.retrieveUserForCurrentSession()
+                val metadata = user.userMetadata
+                Log.d("metadata,", metadata.toString())
+
+                val filename = metadata?.get("phone").toString()
+                val withoutQuote = filename.replace("\"", "")
+                Log.d("filename",withoutQuote)
+
+                val bucket = client.storage[PROFILE_PIC_BUCKET]
+                bucket.upload("$withoutQuote.jpg", imageByteArray)
+                val url = bucket.createSignedUrl("$withoutQuote.jpg", expiresIn = 17520.hours)
+
+                Log.d("image url:", url)
+
+                val uuid= getToken()?.let { client.auth.retrieveUser(it) }?.id
+                Log.d("user uuid",uuid.toString())
+
+
+                client.postgrest["registeredusers"].update(
+                    {
+
+                        User::profile_pic setTo url
+
+                    }
+                ) {
+                    filter {
+                        User::id eq uuid
+                    }
+                }
+
+                _userState.value = UserState.Success("Image Uploaded Successfully!")
+
+            } catch (e: Exception) {
+                _userState.value = UserState.Error("Error: ${e.message}")
+                Log.d("Error in upload",e.message.toString())
+            }
+
+        }
+
+    }
+
 
 }

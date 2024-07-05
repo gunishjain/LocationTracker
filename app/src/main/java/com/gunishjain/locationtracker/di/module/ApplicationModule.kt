@@ -1,11 +1,14 @@
 package com.gunishjain.locationtracker.di.module
 
+import android.content.Context
 import com.gunishjain.locationtracker.utils.Constants.API_KEY
 import com.gunishjain.locationtracker.utils.Constants.BASE_URL
 import com.gunishjain.locationtracker.utils.Constants.HOST_NAME
+import com.gunishjain.locationtracker.utils.SharedPreferenceHelper
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
@@ -53,6 +56,12 @@ class ApplicationModule {
     @Singleton
     fun provideSupaBaseStorage(client: SupabaseClient): Storage {
         return client.storage
+    }
+
+    @Provides
+    @Singleton
+    fun provideSharedPreferenceHelper(@ApplicationContext context: Context): SharedPreferenceHelper {
+        return SharedPreferenceHelper(context)
     }
 
 

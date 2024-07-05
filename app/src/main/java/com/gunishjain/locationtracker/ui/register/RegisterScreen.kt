@@ -1,11 +1,10 @@
 package com.gunishjain.locationtracker.ui.register
 
-import android.net.Uri
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
+import android.util.Log
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,28 +16,29 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import coil.compose.AsyncImage
-import com.gunishjain.locationtracker.utils.uriToByteArray
+import androidx.navigation.NavHostController
+import com.gunishjain.locationtracker.utils.UserState
 
 
 @Composable
-fun RegisterScreen(viewModel: SupaBaseAuthViewModel = hiltViewModel()) {
-
-    var selectedImageUri by remember {
-        mutableStateOf<Uri?>(null)
-    }
+fun RegisterScreen(
+    navController: NavHostController,
+    viewModel: SupaBaseAuthViewModel = hiltViewModel()
+) {
     val ctx = LocalContext.current
+
+    val userState by viewModel.userState
 
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -47,13 +47,6 @@ fun RegisterScreen(viewModel: SupaBaseAuthViewModel = hiltViewModel()) {
     var caste by remember {
         mutableStateOf("")
     }
-
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-        onResult = {
-            selectedImageUri = it
-        })
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -61,24 +54,6 @@ fun RegisterScreen(viewModel: SupaBaseAuthViewModel = hiltViewModel()) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-
-        Button(onClick = {
-            photoPickerLauncher.launch(
-                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-            )
-        }) {
-            Text(text = "Pick Image from Gallery")
-        }
-
-        AsyncImage(
-            modifier = Modifier
-                .width(300.dp)
-                .height(200.dp),
-            model = selectedImageUri,
-            contentDescription = null,
-            contentScale = ContentScale.Crop
-        )
-
         OutlinedTextField(
             value = name,
             onValueChange = { name = it },
@@ -125,16 +100,49 @@ fun RegisterScreen(viewModel: SupaBaseAuthViewModel = hiltViewModel()) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Button(onClick = {
-            val imageByteArray = selectedImageUri?.uriToByteArray(ctx)
-            imageByteArray?.let { it ->
-                viewModel.registerUser(ctx,name,email,password,it,phone)
+        Row(
+            modifier = Modifier.width(200.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom
+
+        ) {
+
+            Button(onClick = {
+                viewModel.registerUser(name, email, password, caste, phone)
+            }) {
+                Text(text = "Register")
             }
-        }) {
-            Text(text = "Register")
+
+            Button(onClick = {
+                navController.navigate("login")
+            }) {
+                Text(text = "Login")
+            }
         }
 
+    }
 
+    LaunchedEffect(userState) {
+        when (userState) {
+            is UserState.Success -> {
+                Toast.makeText(ctx, (userState as UserState.Success).message, Toast.LENGTH_LONG)
+                    .show()
+                Log.d("register", "lol")
+                if ((userState as UserState.Success).message == "Registration successful") {
+                    navController.navigate("login") {
+                        popUpTo("register") { inclusive = true }
+                    }
+                }
+            }
+
+
+            is UserState.Error -> {
+                Toast.makeText(ctx, (userState as UserState.Error).message, Toast.LENGTH_LONG)
+                    .show()
+            }
+
+            else -> {}
+        }
     }
 
 }
